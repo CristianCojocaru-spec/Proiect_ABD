@@ -1,0 +1,129 @@
+PROIECT ABD - Cojocaru George - Cristian, MASTER - TI, Anul 1
+
+Project description
+You are required to make several statistical computations on some US Zips dataset using MongoDB as the database platform.
+
+Prerequisites:
+Download the latest US Zips dataset from https://simplemaps.com/data/us-zips (choose the free tier). The dataset has approximately 33k entries.
+Create a MongoDB instance. You may use your own MongoDB Atlas instance in cloud or use a local instance. For local instances Docker is preferred, but you may also choose to install MongoDB as a standalone server on your OS.
+Import the dataset into the MongoDB instance.
+
+
+Requirements:
+a) Get the states with a total population of over 10 million.
+b) Get the average city population by state.
+c) Get the largest and the smallest city in each state.
+d) Get the largest and the smallest counties in each state.
+e) Get the nearest 10 zips from one of Chicago's landmarks, the Willis Tower situated at coordinates 41.878876, -87.635918.
+f) Get the total population situated between 50 and 200 kms around New York's landmark, the Statue of Liberty at coordinates 40.689247, -74.044502.
+
+Solution:
+--------------------------------------------------------------------------------
+a)	db.USZips.aggregate([
+    {$group : { _id: '$state_id', Total_Population: {$sum:'$population'}}},
+    {$match: { Total_Population: { $gt: 10000000 } } },
+    {$sort: {Total_Population: -1}}]);
+--------------------------------------------------------------------------------
+
+ 
+--------------------------------------------------------------------------------
+b)	db.USZips.aggregate([
+      
+       { $group: {_id: "$state_id", avg_CITY_POP: { $avg: '$population' }}},
+       { $sort: {avg_CITY_POP: -1}}
+]);
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------------
+c)	db.USZips.aggregate([
+        
+        { $group: 
+		{
+            	 _id: "$state_id", 
+            	 Biggest_City: { $max: {population:'$population', city_name:'$city'}},
+            	 Smallest_City:{ $min: {population:'$population', city_name:'$city'}}
+		}
+	},
+	{ $sort: { " Biggest_City.population": 1 } }]);
+-------------------------------------------------------------------------------------- 
+
+
+--------------------------------------------------------------------------------------
+d)	db.USZips.aggregate([
+    { 
+        $group: { 
+            _id: { 
+                state_name: "$state_name", 
+                county_name: "$county_name" 
+            }, 
+            population: { $sum: "$population" } 
+        } 
+    }, 
+    { 
+        $sort: { 
+            population: 1 
+        } 
+    }, 
+    { 
+        $group: { 
+            _id: { 
+                state_name: "$_id.state_name" 
+            }, 
+            counties: { 
+                $push: { 
+                    county_name: "$_id.county_name", 
+                    population: "$population" 
+                } 
+            } 
+        } 
+    },
+    {
+        $project: {
+            _id: 1,
+            Smallest_County: { $arrayElemAt: ["$counties", 0] },
+            Biggest_County: { $arrayElemAt:  ["$counties", -1] }
+        }
+    }
+]);
+--------------------------------------------------------------------------------------
+
+
+-----------------------------------------------------------------------------------------------------------------------------
+e)	db.USZips.updateMany(
+  {},
+  [
+    {
+      $set: {
+        location: {
+          type: "Point",
+          coordinates: ["$lng", "$lat"]
+        }
+      }
+    }
+  ]
+);
+
+
+db.USZips.createIndex({ location: "2dsphere" });
+
+
+db.USZips.find({ location: { $near: { $geometry: { type: "Point", coordinates: [-87.635918, 41.878876] } } } }).limit(10)
+-----------------------------------------------------------------------------------------------------------------------------
+
+ 
+
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+f)	db.USZips.aggregate([{$geoNear: { near: { type: "Point", coordinates : [-74.044502, 40.689247] }, distanceField: "distance", minDistance: 50000, maxDistance: 200000}}, { $group: { _id: 0, Total_Population: {$sum: "$population"}}}])
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ 
+
+
+
+
+
+
+
+
+
+
